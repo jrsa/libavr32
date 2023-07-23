@@ -53,6 +53,7 @@
 #include "uhd.h"
 #include "usbb_otg.h"
 #include "usbb_host.h"
+#include "print_funcs.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -754,6 +755,9 @@ bool uhd_ep_alloc(usb_add_t add, usb_ep_desc_t * ep_desc)
 			break;
 		default:
 			Assert(false);
+      print_dbg("\r\n invalid endpoint type");
+      print_dbg_char_hex(ep_type);
+      print_dbg("\r\n ");
 			return false;
 		}
 		switch(bank) {
@@ -768,16 +772,38 @@ bool uhd_ep_alloc(usb_add_t add, usb_ep_desc_t * ep_desc)
 			break;
 		default:
 			Assert(false);
+      print_dbg("\r\n invalid UECFG0_EPBK (bank) type: ");
+      print_dbg_char_hex(bank);
+      print_dbg("\r\n ");
 			return false;
 		}
+
+    print_dbg("\r\n attempting to configure pipe with sz: ");
+    print_dbg_char_hex(ep_desc->wMaxPacketSize);
+    print_dbg("\r\n ");
+
+    if (cpu_to_le16(ep_desc->wMaxPacketSize == 0)) { // hack for op-1
+      print_dbg("\r\n forcing endpoint size to 64 ");
+      uhd_configure_pipe(pipe, ep_interval, ep_addr, ep_type, ep_dir,
+          64,
+          bank, AVR32_USBB_UPCFG0_AUTOSW_MASK);
+      
+    } else {
 
 		uhd_configure_pipe(pipe, ep_interval, ep_addr, ep_type, ep_dir,
 				le16_to_cpu(ep_desc->wMaxPacketSize),
 				bank, AVR32_USBB_UPCFG0_AUTOSW_MASK);
+    
+    }
+
 		uhd_allocate_memory(pipe);
 		if (!Is_uhd_pipe_configured(pipe)) {
 			uhd_disable_pipe(pipe);
-			return false;
+      print_dbg("\r\n pipe not configured: ");
+      print_dbg_char_hex(pipe);
+      print_dbg("\r\n ");
+			//return false;
+      continue;
 		}
 		uhd_configure_address(pipe, add);
 		uhd_enable_pipe(pipe);
@@ -789,6 +815,7 @@ bool uhd_ep_alloc(usb_add_t add, usb_ep_desc_t * ep_desc)
 		uhd_enable_pipe_interrupt(pipe);
 		return true;
 	}
+    print_dbg("\r\n all usb pipes already enabled (?)");
 	return false;
 }
 
